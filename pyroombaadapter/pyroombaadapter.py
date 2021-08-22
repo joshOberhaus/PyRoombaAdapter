@@ -33,6 +33,7 @@ class PyRoombaAdapter:
     """
     CMD = {"Start": 128,
            "Baud": 129,
+           "Control": 130,
            "Safe": 131,
            "Full": 132,
            "Power": 133,
@@ -69,8 +70,9 @@ class PyRoombaAdapter:
         self.WHEEL_SPAN = wheel_span_mm
         try:
             self.serial_con = self._connect_serial(port, bau_rate, time_out_sec)
-        except serial.SerialException as exc:
-            raise ConnectionError(f"Cannot find serial port ('{port}'). Please reconnect it.") from exc
+        except serial.SerialException:
+            print("Cannot find serial port. Please reconnect it.")
+            sys.exit(1)
 
         self.change_mode_to_safe()  # default mode is safe mode
         sleep(1.0)
@@ -103,6 +105,20 @@ class PyRoombaAdapter:
         """
         self._send_cmd(self.CMD["Start"])
         self._send_cmd(self.CMD["Clean"])
+
+    def start_control(self):
+        """
+        Start the default cleaning
+
+        - Available in modes: Passive, Safe, or Full
+        - Changes mode to: Passive
+
+        Examples:
+            >>> PORT = "/dev/ttyUSB0"
+            >>> adapter = PyRoombaAdapter(PORT)
+            >>> adapter.start_cleaning()
+        """
+        self._send_cmd(self.CMD["Control"])
 
     def start_max_cleaning(self):
         """
@@ -191,7 +207,6 @@ class PyRoombaAdapter:
         - Available in modes: Passive, Safe, or Full
         """
         # send command
-        self._send_cmd(self.CMD["Start"])
         self._send_cmd(self.CMD["Full"])
 
         # TODO implement
@@ -218,12 +233,10 @@ class PyRoombaAdapter:
     def request_data(self, request_id_list):
 
         if len(request_id_list) == 1:  # single packet
-            self._send_cmd(self.CMD["Start"])
             self._send_cmd(self.CMD["Sensors"])
             self._send_cmd(request_id_list[0])
             sleep(0.5)
-            print("re:", self.serial_con.read())
-            sleep(0.5)
+            print("re:", self.serial_con.read(size=26))
 
     def move(self, velocity, yaw_rate):
         """
@@ -245,11 +258,11 @@ class PyRoombaAdapter:
         :param float yaw_rate: yaw rate (rad/sec)
 
         Examples:
-            >>> import math
+            >>> import numpy as np
             >>> import time
             >>> PORT = "/dev/ttyUSB0"
             >>> adapter = PyRoombaAdapter(PORT)
-            >>> adapter.move(0, math.radians(-10)) # rotate to right side
+            >>> adapter.move(0, np.rad2deg(-10)) # rotate to right side
             >>> time.sleep(1.0) # keep rotate
             >>> adapter.move(0.1, 0.0) # move straight with 10cm/sec
         """
@@ -615,8 +628,8 @@ def main():
     adapter = PyRoombaAdapter(PORT)
     # adapter.send_drive_cmd(-100, -1000)
     # adapter.send_drive_direct(-100, 100)
-    import math
-    # adapter.move(0.1, math.radians(-10))
+    import numpy as np
+    # adapter.move(0.1, np.deg2rad(-10))
     # adapter.send_drive_pwm(80, 80)
     # adapter.send_drive_pwm(-200, -200)
     # adapter.send_moters_cmd(False, True, True, True, False)
@@ -624,13 +637,13 @@ def main():
     # adapter.send_buttons_cmd(dock=True)
     # sleep(1.0)
 
-    adapter.move(0.2, math.radians(0.0))
+    adapter.move(0.2, np.deg2rad(0.0))
     sleep(1.0)
-    adapter.move(0, math.radians(-20))
+    adapter.move(0, np.deg2rad(-20))
     sleep(6.0)
-    adapter.move(0.2, math.radians(0.0))
+    adapter.move(0.2, np.deg2rad(0.0))
     sleep(1.0)
-    adapter.move(0, math.radians(20))
+    adapter.move(0, np.deg2rad(20))
     sleep(6.0)
 
     # adapter.move(-0.1, 0)
